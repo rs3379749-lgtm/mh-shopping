@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MH Shopping</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f5f9;color:#222}
+header{background:linear-gradient(120deg,#075fbd,#09a5e8);color:white;text-align:center;padding:22px}
+header h1{margin:0}
+nav{display:flex;justify-content:center;gap:8px;padding:12px;background:white;flex-wrap:wrap}
+button{border:0;padding:11px 15px;border-radius:7px;background:#087bdb;color:white;cursor:pointer;margin:3px}
+button:hover{background:#05569d}
+input,select,textarea{padding:12px;width:100%;margin:7px 0;border:1px solid #ccc;border-radius:7px}
+h2{text-align:center}
+.products{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:12px}
+.product{background:white;padding:12px;border-radius:12px;text-align:center;box-shadow:0 2px 8px #ddd}
+.product img{width:100%;height:125px;object-fit:contain}
+.price{color:#087bdb;font-weight:bold}
+.panel{background:white;margin:14px;padding:16px;border-radius:12px;box-shadow:0 2px 8px #ddd}
+.hide{display:none!important}
+footer{text-align:center;background:#222;color:white;padding:20px;margin-top:25px}
+.green{background:#159447}
+.red{background:#d83232}
+</style>
+</head>
+<body>
+
+<header>
+<h1>MH Shopping</h1>
+<p>আপনার পছন্দের কেনাকাটা</p>
+</header>
+
+<nav>
+<button onclick="show('shop')">🏠 Home</button>
+<button onclick="show('cart')">🛒 Cart (<span id="count">0</span>)</button>
+<button onclick="show('login')">Admin</button>
+</nav>
+
+<section id="shop">
+<h2>আমাদের পণ্য</h2>
+<div style="padding:10px">
+<input id="search" placeholder="পণ্য খুঁজুন..." oninput="renderProducts()">
+</div>
+<div class="products" id="products"></div>
+</section>
+
+<section id="cart" class="hide">
+<div class="panel">
+<h2>🛒 Shopping Cart</h2>
+<div id="cartItems"></div>
+<h3 id="total">মোট: ৳0</h3>
+<button onclick="show('checkout')">অর্ডার করুন</button>
+</div>
+</section>
+
+<section id="checkout" class="hide">
+<div class="panel">
+<h2>📦 অর্ডার তথ্য</h2>
+<input id="customerName" placeholder="আপনার নাম">
+<input id="customerPhone" placeholder="মোবাইল নম্বর">
+<textarea id="customerAddress" placeholder="সম্পূর্ণ ডেলিভারি ঠিকানা"></textarea>
+
+<h3>পেমেন্ট পদ্ধতি</h3>
+<select id="payment" onchange="paymentChange()">
+<option value="Cash on Delivery">Cash on Delivery</option>
+<option value="bKash">bKash</option>
+<option value="Nagad">Nagad</option>
+</select>
+
+<div id="trxArea" class="hide">
+<p>Transaction ID লিখুন</p>
+<input id="trx" placeholder="Transaction ID">
+</div>
+
+<button class="green" onclick="placeOrder()">অর্ডার কনফার্ম করুন</button>
+</div>
+</section>
+
+<section id="login" class="hide">
+<div class="panel">
+<h2>🔐 Admin Login</h2>
+<input id="password" type="password" placeholder="Admin Password">
+<button onclick="login()">Login</button>
+<p id="message"></p>
+</div>
+</section>
+
+<section id="admin" class="hide">
+<div class="panel">
+<h2>⚙️ Admin Dashboard</h2>
+
+<h3>নতুন পণ্য যোগ করুন</h3>
+<input id="name" placeholder="পণ্যের নাম">
+<input id="price" type="number" placeholder="পণ্যের দাম">
+<input id="photo" placeholder="পণ্যের ছবির URL">
+<button onclick="addProduct()">পণ্য যোগ করুন</button>
+
+<h3>পণ্য পরিচালনা</h3>
+<div id="manage"></div>
+
+<hr>
+<h3>📦 কাস্টমার অর্ডার</h3>
+<div id="orders"></div>
+
+<button class="red" onclick="logout()">Logout</button>
+</div>
+</section>
+
+<footer>
+<h3>MH Shopping</h3>
+<p>Thank you for shopping with us.</p>
+</footer>
+
+<script>
+let products=JSON.parse(localStorage.getItem("mh_products"))||[
+{id:1,name:"Smart Watch",price:1200,img:"https://placehold.co/200"},
+{id:2,name:"Headphone",price:800,img:"https://placehold.co/200"}
+];
+
+let cart=[];
+let orders=JSON.parse(localStorage.getItem("mh_orders"))||[];
+
+function saveData(){
+localStorage.setItem("mh_products",JSON.stringify(products));
+localStorage.setItem("mh_orders",JSON.stringify(orders));
+}
+
+function show(id){
+document.querySelectorAll("body > section").forEach(s=>s.classList.add("hide"));
+document.getElementById(id).classList.remove("hide");
+if(id==="cart")renderCart();
+if(id==="admin"){renderManage();renderOrders();}
+}
+
+function renderProducts(){
+let q=document.getElementById("search").value.toLowerCase();
+let filtered=products.filter(p=>p.name.toLowerCase().includes(q));
+
+document.getElementById("products").innerHTML=filtered.map(p=>`
+<div class="product">
+<img src="${p.img}" alt="${p.name}">
+<h3>${p.name}</h3>
+<p class="price">৳${p.price}</p>
+<button onclick="addCart(${p.id})">Add to Cart</button>
+</div>`).join("")||"কোনো পণ্য পাওয়া যায়নি";
+}
+
+function addCart(id){
+let p=products.find(x=>x.id===id);
+if(p)cart.push({...p});
+document.getElementById("count").innerText=cart.length;
+alert("পণ্য কার্টে যোগ হয়েছে");
+}
+
+function renderCart(){
+let total=0;
+document.getElementById("cartItems").innerHTML=cart.map((p,i)=>{
+total+=p.price;
+return `<p>${p.name} - ৳${p.price}
+<button class="red" onclick="removeCart(${i})">Remove</button></p>`;
+}).join("")||"কার্ট খালি";
+document.getElementById("total").innerText="মোট: ৳"+total;
+}
+
+function removeCart(i){
+cart.splice(i,1);
+document.getElementById("count").innerText=cart.length;
+renderCart();
+}
+
+function login(){
+if(document.getElementById("password").value==="MH12345"){
+document.getElementById("password").value="";
+show("admin");
+}else{
+document.getElementById("message").innerText="পাসওয়ার্ড ভুল হয়েছে";
+}
+}
+
+function addProduct(){
+let name=document.getElementById("name").value.trim();
+let price=Number(document.getElementById("price").value);
+let img=document.getElementById("photo").value.trim();
+
+if(!name||price<=0){
+alert("পণ্যের নাম ও সঠিক দাম দিন");
+return;
+}
+
+products.push({
+id:Date.now(),
+name:name,
+price:price,
+img:img||"https://placehold.co/200"
+});
+
+saveData();
+renderProducts();
+renderManage();
+
+document.getElementById("name").value="";
+document.getElementById("price").value="";
+document.getElementById("photo").value="";
+
+alert("নতুন পণ্য যোগ হয়েছে");
+}
+
+function renderManage(){
+document.getElementById("manage").innerHTML=products.map(p=>`
+<p>${p.name} - ৳${p.price}
+<button class="red" onclick="deleteProduct(${p.id})">Delete</button></p>
+`).join("")||"কোনো পণ্য নেই";
+}
+
+function deleteProduct(id){
+products=products.filter(p=>p.id!==id);
+saveData();
+renderProducts();
+renderManage();
+}
+
+function paymentChange(){
+let method=document.getElementById("payment").value;
+document.getElementById("trxArea").classList.toggle("hide",method==="Cash on Delivery");
+}
+
+function placeOrder(){
+let name=document.getElementById("customerName").value.trim();
+let phone=document.getElementById("customerPhone").value.trim();
+let address=document.getElementById("customerAddress").value.trim();
+let payment=document.getElementById("payment").value;
+let trx=document.getElementById("trx").value.trim();
+
+if(cart.length===0){
+alert("আপনার কার্ট খালি");
+return;
+}
+
+if(!name||!phone||!address){
+alert("সব তথ্য পূরণ করুন");
+return;
+}
+
+if((payment==="bKash"||payment==="Nagad")&&!trx){
+alert("Transaction ID লিখুন");
+return;
+}
+
+let total=cart.reduce((sum,p)=>sum+p.price,0);
+
+orders.push({
+id:Date.now(),
+name,phone,address,payment,trx,
+items:cart.map(p=>p.name).join(", "),
+total,
+status:"নতুন অর্ডার"
+});
+
+saveData();
+alert("অর্ডারের অনুরোধ জমা হয়েছে!");
+
+cart=[];
+document.getElementById("count").innerText=0;
+document.getElementById("customerName").value="";
+document.getElementById("customerPhone").value="";
+document.getElementById("customerAddress").value="";
+document.getElementById("trx").value="";
+
+show("shop");
+}
+
+function renderOrders(){
+document.getElementById("orders").innerHTML=orders.map(o=>`
+<div class="panel">
+<p><b>অর্ডার ID:</b> ${o.id}</p>
+<p>নাম: ${o.name}</p>
+<p>ফোন: ${o.phone}</p>
+<p>ঠিকানা: ${o.address}</p>
+<p>পণ্য: ${o.items}</p>
+<p>মোট: ৳${o.total}</p>
+<p>পেমেন্ট: ${o.payment}</p>
+<p>Transaction ID: ${o.trx||"নেই"}</p>
+<p>অবস্থা: ${o.status}</p>
+<button class="green" onclick="completeOrder(${o.id})">সম্পন্ন</button>
+<button class="red" onclick="deleteOrder(${o.id})">Delete</button>
+</div>
+`).join("")||"এখনো কোনো অর্ডার নেই";
+}
+
+function completeOrder(id){
+let o=orders.find(x=>x.id===id);
+if(o)o.status="সম্পন্ন";
+saveData();
+renderOrders();
+}
+
+function deleteOrder(id){
+orders=orders.filter(x=>x.id!==id);
+saveData();
+renderOrders();
+}
+
+function logout(){
+show("login");
+}
+
+renderProducts();
+</script>
+</body>
+</html>
